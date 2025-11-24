@@ -3,7 +3,7 @@ Database configuration and CRUD operations
 """
 
 from sqlalchemy import create_engine, and_, or_
-from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.orm import sessionmaker, scoped_session, joinedload
 from models import Base, Team, Employee, Vacation
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict
@@ -47,7 +47,7 @@ def get_all_teams() -> List[Team]:
     """Get all teams"""
     session = get_session()
     try:
-        return session.query(Team).all()
+        return session.query(Team).options(joinedload(Team.employees)).all()
     finally:
         session.close()
 
@@ -56,7 +56,7 @@ def get_team_by_id(team_id: int) -> Optional[Team]:
     """Get team by ID"""
     session = get_session()
     try:
-        return session.query(Team).filter(Team.id == team_id).first()
+        return session.query(Team).options(joinedload(Team.employees)).filter(Team.id == team_id).first()
     finally:
         session.close()
 
@@ -120,7 +120,7 @@ def get_all_employees() -> List[Employee]:
     """Get all employees"""
     session = get_session()
     try:
-        return session.query(Employee).all()
+        return session.query(Employee).options(joinedload(Employee.team)).all()
     finally:
         session.close()
 
@@ -129,7 +129,7 @@ def get_employees_by_team(team_id: int) -> List[Employee]:
     """Get all employees in a team"""
     session = get_session()
     try:
-        return session.query(Employee).filter(Employee.team_id == team_id).all()
+        return session.query(Employee).options(joinedload(Employee.team)).filter(Employee.team_id == team_id).all()
     finally:
         session.close()
 
@@ -138,7 +138,7 @@ def get_employee_by_id(employee_id: int) -> Optional[Employee]:
     """Get employee by ID"""
     session = get_session()
     try:
-        return session.query(Employee).filter(Employee.id == employee_id).first()
+        return session.query(Employee).options(joinedload(Employee.team)).filter(Employee.id == employee_id).first()
     finally:
         session.close()
 
@@ -214,7 +214,9 @@ def get_all_vacations() -> List[Vacation]:
     """Get all vacations"""
     session = get_session()
     try:
-        return session.query(Vacation).all()
+        return session.query(Vacation).options(
+            joinedload(Vacation.employee).joinedload(Employee.team)
+        ).all()
     finally:
         session.close()
 
@@ -232,7 +234,9 @@ def get_vacations_by_date_range(start_date: date, end_date: date) -> List[Vacati
     """Get all vacations within a date range"""
     session = get_session()
     try:
-        return session.query(Vacation).filter(
+        return session.query(Vacation).options(
+            joinedload(Vacation.employee).joinedload(Employee.team)
+        ).filter(
             or_(
                 and_(Vacation.start_date >= start_date, Vacation.start_date <= end_date),
                 and_(Vacation.end_date >= start_date, Vacation.end_date <= end_date),
@@ -247,7 +251,9 @@ def get_vacations_by_team_and_date(team_id: int, start_date: date, end_date: dat
     """Get all vacations for a team within a date range"""
     session = get_session()
     try:
-        return session.query(Vacation).join(Employee).filter(
+        return session.query(Vacation).join(Employee).options(
+            joinedload(Vacation.employee).joinedload(Employee.team)
+        ).filter(
             Employee.team_id == team_id,
             or_(
                 and_(Vacation.start_date >= start_date, Vacation.start_date <= end_date),

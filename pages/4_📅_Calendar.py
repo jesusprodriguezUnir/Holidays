@@ -23,52 +23,56 @@ st.markdown("Visualiza y gestiona las vacaciones del equipo")
 st.markdown("---")
 
 # Tabs
-tab1, tab2 = st.tabs(["📊 Ver Calendario", "➕ Gestionar Vacaciones"])
+tab1, tab2 = st.tabs(["📊 Cuadrante", "➕ Gestionar Vacaciones"])
 
 with tab1:
-    st.subheader("Vista de Calendario")
+    st.subheader("Cuadrante de Vacaciones")
     
     # Filtros
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns([1, 2])
     
     with col1:
         # Filtro de equipo
         teams = get_all_teams()
         team_options = ["Todos los equipos"] + [team.name for team in teams]
-        selected_team_filter = st.selectbox("Equipo:", team_options)
+        # Default to Alfa if exists
+        default_index = 0
+        if "Alfa" in team_options:
+            default_index = team_options.index("Alfa")
+        selected_team_filter = st.selectbox("Equipo:", team_options, index=default_index)
     
     with col2:
         # Selector de período
-        period_type = st.selectbox("Período:", ["Mes", "Trimestre", "Año", "Personalizado"])
+        period_options = [
+            "Navidad 2025 (22 Dic - 7 Ene)",
+            "Verano 2025 (15 Jun - 15 Sep)",
+            "Año Completo 2025",
+            "Mes Actual",
+            "Personalizado"
+        ]
+        period_type = st.selectbox("Período:", period_options)
     
-    with col3:
-        # Año
-        current_year = datetime.now().year
-        year = st.number_input("Año:", min_value=2020, max_value=2030, value=current_year)
+    # Determinar rango de fechas
+    today = date.today()
+    year = 2025 # Default year as per request
     
-    # Determinar rango de fechas según el período
-    if period_type == "Mes":
-        month = st.selectbox("Mes:", list(range(1, 13)), 
-                            format_func=lambda x: calendar.month_name[x],
-                            index=datetime.now().month - 1)
-        start_date, end_date = get_month_date_range(year, month)
-    
-    elif period_type == "Trimestre":
-        quarter = st.selectbox("Trimestre:", [1, 2, 3, 4], 
-                              format_func=lambda x: f"Q{x}")
-        start_date, end_date = get_quarter_date_range(year, quarter)
-    
-    elif period_type == "Año":
-        start_date, end_date = get_year_date_range(year)
-    
+    if "Navidad 2025" in period_type:
+        start_date = date(2025, 12, 22)
+        end_date = date(2026, 1, 7)
+    elif "Verano 2025" in period_type:
+        start_date = date(2025, 6, 15)
+        end_date = date(2025, 9, 15)
+    elif "Año Completo 2025" in period_type:
+        start_date = date(2025, 1, 1)
+        end_date = date(2025, 12, 31)
+    elif "Mes Actual" in period_type:
+        start_date, end_date = get_month_date_range(today.year, today.month)
     else:  # Personalizado
         col_a, col_b = st.columns(2)
         with col_a:
             start_date = st.date_input("Fecha inicio:", value=date(year, 1, 1))
         with col_b:
             end_date = st.date_input("Fecha fin:", value=date(year, 12, 31))
-    
-    st.markdown("---")
     
     # Obtener datos
     try:
@@ -88,48 +92,58 @@ with tab1:
             # Generar datos del calendario
             calendar_data = generate_calendar_data(employees, vacations, start_date, end_date)
             
-            # Mostrar resumen
-            st.subheader(f"📊 Resumen: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
+            # --- VISTA CUADRANTE ---
             
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Empleados", len(calendar_data))
-            with col2:
-                total_vacation_days = sum([item['total_days'] for item in calendar_data])
-                st.metric("Total Días de Vacaciones", total_vacation_days)
-            with col3:
-                avg_days = round(total_vacation_days / len(calendar_data), 1) if calendar_data else 0
-                st.metric("Promedio por Empleado", avg_days)
+            # Generar lista de fechas
+            date_range = []
+            curr = start_date
+            while curr <= end_date:
+                date_range.append(curr)
+                curr += timedelta(days=1)
             
-            st.markdown("---")
+            # Crear estructura para DataFrame
+            # Filas: Empleados
+            # Columnas: Info + Fechas
             
-            # Tabla de calendario
-            st.subheader("📅 Calendario Detallado")
-            
-            # Crear DataFrame para mostrar
-            df_data = []
+            quadrant_data = []
             for item in calendar_data:
-                df_data.append({
-                    "Empleado": item['name'],
+                row = {
+                    "Nombre": item['name'],
                     "Rol": item['role'],
-                    "Equipo": item['team'],
-                    "Días de Vacaciones": item['total_days']
-                })
+                    "Total Días": item['total_days']
+                }
+                
+                # Marcar días
+                for d in date_range:
+                    col_name = d.strftime("%d-%b")
+                    if d in item['vacation_dates']:
+                        row[col_name] = "X"
+                    else:
+                        row[col_name] = ""
+                
+                quadrant_data.append(row)
             
-            df = pd.DataFrame(df_data)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            df_quadrant = pd.DataFrame(quadrant_data)
             
-            # Detalles de vacaciones por empleado
-            with st.expander("📋 Ver Detalles de Vacaciones"):
-                for item in calendar_data:
-                    if item['vacations']:
-                        st.write(f"**{item['name']}** ({item['team']})")
-                        for vac in item['vacations']:
-                            days = (vac['end_date'] - vac['start_date']).days + 1
-                            st.write(f"  - {vac['start_date'].strftime('%d/%m/%Y')} a {vac['end_date'].strftime('%d/%m/%Y')} ({days} días) - {vac['type']}")
-                            if vac['notes']:
-                                st.write(f"    *Notas: {vac['notes']}*")
-                        st.markdown("---")
+            # Configurar columnas
+            column_config = {
+                "Nombre": st.column_config.TextColumn("Nombre"),
+                "Rol": st.column_config.TextColumn("Rol"),
+                "Total Días": st.column_config.NumberColumn("Total")
+            }
+            
+            st.dataframe(
+                df_quadrant,
+                use_container_width=True,
+                hide_index=True,
+                column_config=column_config,
+                height=500
+            )
+            
+            st.caption("Leyenda: 'X' indica día de vacaciones.")
+            
+            # --- FIN VISTA CUADRANTE ---
+            
         else:
             st.info("No hay empleados en el equipo seleccionado.")
     
@@ -158,27 +172,27 @@ with tab2:
             
             col1, col2 = st.columns(2)
             with col1:
-                start_date = st.date_input("Fecha inicio:", value=date.today())
+                start_date_input = st.date_input("Fecha inicio:", value=date.today())
             with col2:
-                end_date = st.date_input("Fecha fin:", value=date.today())
+                end_date_input = st.date_input("Fecha fin:", value=date.today())
             
             vacation_type = st.selectbox("Tipo:", ["vacation", "sick", "personal", "other"])
             notes = st.text_area("Notas (opcional):", height=100)
             
             # Mostrar días
-            if start_date and end_date and start_date <= end_date:
-                days = count_vacation_days(start_date, end_date)
+            if start_date_input and end_date_input and start_date_input <= end_date_input:
+                days = count_vacation_days(start_date_input, end_date_input)
                 st.info(f"📊 Total: {days} días")
             
             submit = st.form_submit_button("💾 Guardar Vacaciones", use_container_width=True)
             
             if submit:
-                if start_date > end_date:
+                if start_date_input > end_date_input:
                     st.error("La fecha de inicio debe ser anterior o igual a la fecha de fin")
                 else:
                     # Verificar conflictos
                     all_vacations = get_vacations_by_employee(selected_emp.id)
-                    conflicts = get_vacation_conflicts(selected_emp.id, start_date, end_date, all_vacations)
+                    conflicts = get_vacation_conflicts(selected_emp.id, start_date_input, end_date_input, all_vacations)
                     
                     if conflicts:
                         st.error(f"⚠️ Conflicto detectado: Este empleado ya tiene vacaciones en estas fechas")
@@ -188,8 +202,8 @@ with tab2:
                         try:
                             new_vacation = create_vacation(
                                 employee_id=selected_emp.id,
-                                start_date=start_date,
-                                end_date=end_date,
+                                start_date=start_date_input,
+                                end_date=end_date_input,
                                 vacation_type=vacation_type,
                                 notes=notes.strip() if notes.strip() else None
                             )
@@ -296,34 +310,3 @@ with tab2:
                         st.rerun()
         else:
             st.info(f"No hay vacaciones registradas para {selected_emp.name}")
-
-# Ayuda
-with st.expander("ℹ️ Ayuda"):
-    st.markdown("""
-    ### Calendario de Vacaciones
-    
-    **Ver Calendario:**
-    - Selecciona un equipo o "Todos los equipos"
-    - Elige el período (mes, trimestre, año o personalizado)
-    - Visualiza el resumen y los detalles
-    
-    **Añadir Vacaciones:**
-    1. Selecciona el empleado
-    2. Indica las fechas de inicio y fin
-    3. Selecciona el tipo de ausencia
-    4. Opcionalmente añade notas
-    5. Haz clic en "Guardar"
-    
-    **Editar/Eliminar:**
-    1. Selecciona el empleado
-    2. Elige el período de vacaciones
-    3. Haz clic en "Editar" o "Eliminar"
-    
-    **Tipos de ausencia:**
-    - **vacation**: Vacaciones normales
-    - **sick**: Baja por enfermedad
-    - **personal**: Asuntos personales
-    - **other**: Otros
-    
-    **Nota:** El sistema detecta automáticamente conflictos de fechas.
-    """)

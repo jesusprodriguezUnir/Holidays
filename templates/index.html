@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planificador de Vacaciones - Equipo Alfa</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <div class="header-content">
+                <h1>🏖️ Planificador de Vacaciones</h1>
+                <nav>
+                    <button class="nav-btn active" data-view="quadrant">Cuadrante</button>
+                    <button class="nav-btn" data-view="teams">Equipos</button>
+                    <button class="nav-btn" data-view="employees">Empleados</button>
+                </nav>
+            </div>
+        </header>
+
+        <main>
+            <!-- VIEW: QUADRANT -->
+            <div id="view-quadrant" class="view active">
+                <div class="controls-bar">
+                    <div class="control-group">
+                        <label>Equipo:</label>
+                        <select id="team-select">
+                            <option value="" disabled selected>Cargando...</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Periodo:</label>
+                        <select id="period-select">
+                            <option value="navidad2025">Navidad 2025 (22 Dic - 7 Ene)</option>
+                            <option value="verano2025">Verano 2025 (15 Jun - 15 Sep)</option>
+                            <option value="anio2025">Año Completo 2025</option>
+                        </select>
+                    </div>
+                    <button id="refresh-btn" class="btn-secondary">🔄 Actualizar</button>
+                    <button id="add-range-btn" class="btn-primary">➕ Añadir Rango</button>
+                </div>
+
+                <div class="calendar-container">
+                    <div id="calendar-grid" class="calendar-grid">
+                        <div class="loading-spinner">Cargando calendario...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW: TEAMS -->
+            <div id="view-teams" class="view hidden">
+                <div class="view-header">
+                    <h2>Gestión de Equipos</h2>
+                    <button id="new-team-btn" class="btn-primary">Nuevo Equipo</button>
+                </div>
+                <div class="table-container">
+                    <table id="teams-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Descripción</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- VIEW: EMPLOYEES -->
+            <div id="view-employees" class="view hidden">
+                <div class="view-header">
+                    <h2>Gestión de Empleados</h2>
+                    <button id="new-employee-btn" class="btn-primary">Nuevo Empleado</button>
+                </div>
+                <div class="table-container">
+                    <table id="employees-table">
+                        <thead>
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Rol</th>
+                                <th>Equipo</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <div id="toast" class="toast hidden">Cambio guardado</div>
+
+        <!-- MODALS -->
+
+        <!-- Modal: Vacation Range -->
+        <div id="modal-range" class="modal hidden">
+            <div class="modal-content">
+                <h3>Añadir Vacaciones (Rango)</h3>
+                <form id="form-range">
+                    <div class="form-group">
+                        <label>Empleado:</label>
+                        <select id="range-employee" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>Desde:</label>
+                        <input type="date" id="range-start" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Hasta:</label>
+                        <input type="date" id="range-end" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tipo:</label>
+                        <select id="range-type">
+                            <option value="vacation">Vacaciones</option>
+                            <option value="sick">Baja</option>
+                            <option value="personal">Personal</option>
+                        </select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary close-modal">Cancelar</button>
+                        <button type="submit" class="btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Team -->
+        <div id="modal-team" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="modal-team-title">Nuevo Equipo</h3>
+                <form id="form-team">
+                    <input type="hidden" id="team-id">
+                    <div class="form-group">
+                        <label>Nombre:</label>
+                        <input type="text" id="team-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Descripción:</label>
+                        <textarea id="team-desc"></textarea>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary close-modal">Cancelar</button>
+                        <button type="submit" class="btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal: Employee -->
+        <div id="modal-employee" class="modal hidden">
+            <div class="modal-content">
+                <h3 id="modal-employee-title">Nuevo Empleado</h3>
+                <form id="form-employee">
+                    <input type="hidden" id="emp-id">
+                    <div class="form-group">
+                        <label>Nombre:</label>
+                        <input type="text" id="emp-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Rol:</label>
+                        <input type="text" id="emp-role">
+                    </div>
+                    <div class="form-group">
+                        <label>Equipo:</label>
+                        <select id="emp-team" required></select>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary close-modal">Cancelar</button>
+                        <button type="submit" class="btn-primary">Guardar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>
